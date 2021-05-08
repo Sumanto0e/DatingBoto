@@ -6,12 +6,9 @@
 
 # гайд по импортам;
 
-import vk_api  # модуль для работы с api
 import datetime  # модуль для работы с датами
 import random  # модуль для работы со случайными числами
 import requests  # модуль для запросов (в моём случае к QIWI api)
-import os  # модуль для удаления графика актива
-import json  # модуль для QIWI api
 import pyqiwi  # модуль для получения истории платежей (Т.К. через api не получилось)
 import keys  # ...
 from vk_api import VkApi  # модуль для работы с api
@@ -42,7 +39,6 @@ try:
                      f'views_count INT,'
                      f'pro_update_date TEXT,'
                      f'referral_code TEXT,'
-                     f'day_in_statistics INT,'
                      f'payment_code INT,'
                      f'age INT,'
                      f'sex INT,'
@@ -61,27 +57,28 @@ qiwi_count = 10
 
 
 # создаю основные клавиатуры
-mainmenu = VkKeyboard(inline=False)  # Клавиатура главного меню
-mainmenu.add_button('Смотреть 👀', VkKeyboardColor.PRIMARY)
-mainmenu.add_button('Моя анкета 🙍‍♂️', color=VkKeyboardColor.SECONDARY)
+mainmenu = VkKeyboard()
+mainmenu.add_button('❤', VkKeyboardColor.POSITIVE)
+mainmenu.add_button('✉', VkKeyboardColor.PRIMARY)
+mainmenu.add_button('💔', VkKeyboardColor.NEGATIVE)
+mainmenu.add_button('🙍‍♂', VkKeyboardColor.SECONDARY)
 mainmenu.add_line()
-mainmenu.add_button('Купить pro 👑', VkKeyboardColor.POSITIVE)
+mainmenu.add_button('Продолжить просмотр 👀', VkKeyboardColor.POSITIVE)
+mainmenu.add_line()
+mainmenu.add_button('Купить pro 👑', VkKeyboardColor.SECONDARY)
 
-promainmenu = VkKeyboard(inline=False)  # Клавиатура главного меню
-promainmenu.add_button('Смотреть 👀', VkKeyboardColor.PRIMARY)
-promainmenu.add_button('Моя анкета 🙍‍♂️', color=VkKeyboardColor.SECONDARY)
+promainmenu = VkKeyboard()
+promainmenu.add_button('❤', VkKeyboardColor.POSITIVE)
+promainmenu.add_button('✉', VkKeyboardColor.PRIMARY)
+promainmenu.add_button('💔', VkKeyboardColor.NEGATIVE)
+promainmenu.add_button('🙍‍♂', VkKeyboardColor.SECONDARY)
+promainmenu.add_line()
+promainmenu.add_button('Продолжить просмотр 👀', VkKeyboardColor.POSITIVE)
 
-createprofile = VkKeyboard(inline=True)  # клавиатура создания анкеты
-createprofile.add_button('Создать анкету 🦧', VkKeyboardColor.POSITIVE)
-
-rating_keyboard = VkKeyboard(inline=True)
-rating_keyboard.add_button('❤', VkKeyboardColor.POSITIVE)
-rating_keyboard.add_button('✉', VkKeyboardColor.PRIMARY)
-rating_keyboard.add_button('💔', VkKeyboardColor.NEGATIVE)
+createprofile = VkKeyboard(inline=True)
+createprofile.add_button(f'Создать анкету {choice(["🎅", "🎁", "😉", "👑"])}')
 
 main_profile_keyboard = VkKeyboard(inline=True)
-# main_profile_keyboard.add_button('Моя статистика 📊', VkKeyboardColor.POSITIVE)
-# main_profile_keyboard.add_line()
 main_profile_keyboard.add_button('Мой реф. код 🔑', VkKeyboardColor.SECONDARY)
 main_profile_keyboard.add_line()
 main_profile_keyboard.add_button('Ввести реф. код 🔑', VkKeyboardColor.SECONDARY)
@@ -278,10 +275,12 @@ for i in longpoll.listen():
                     if city == 'all':
                         city = 'все города'
 
+                    keyboard = mainmenu if pro == 0 else promainmenu
+
                     age = user[16] if user[16] else 'не указан'
                     send('✅ Подходящая анкета:\n\n'
                          f'{pro} {user[1]} {user[2]} | {age} | {city}\n\n'
-                         f'{user[3]}\n\nФото:', rating_keyboard.get_keyboard(),
+                         f'{user[3]}\n\nФото:', keyboard.get_keyboard(),
                          user_id,
                          photo)
 
@@ -333,22 +332,25 @@ for i in longpoll.listen():
             send('❌ Ваш акаунт был заблокирован.')
 
         elif state == 5:  # состояние отправки сообщения
-            send('✅ Отправлено;')
-
-            recipient = database.execute(f'SELECT viewed_user FROM users WHERE user_id={user_id}').fetchone()
-            recipient = database.execute(
-                f'SELECT name, surname, user_id FROM users WHERE user_id={recipient[0]}').fetchone()
-            sender = database.execute(f'SELECT name, surname FROM users WHERE user_id={user_id}').fetchone()
-            user = bot.method(f'users.get', {'user_ids': [user_id], 'fields': 'screen_name'})[0]
             try:
-                send(f'@{user["screen_name"]} ({sender[0]} {sender[1]}) оставил тебе сообщение:\n'
-                     f'{text}', None, recipient[2])
+                send('✅ Отправлено;')
 
+                recipient = database.execute(f'SELECT viewed_user FROM users WHERE user_id={user_id}').fetchone()
+                recipient = database.execute(
+                    f'SELECT name, surname, user_id FROM users WHERE user_id={recipient[0]}').fetchone()
+                sender = database.execute(f'SELECT name, surname FROM users WHERE user_id={user_id}').fetchone()
+                user = bot.method(f'users.get', {'user_ids': [user_id], 'fields': 'screen_name'})[0]
+                try:
+                    send(f'@{user["screen_name"]} ({sender[0]} {sender[1]}) оставил тебе сообщение:\n'
+                         f'{text}', None, recipient[2])
+
+                except:
+                    send('Пользователь заблокировал бота.')
+
+                database_query(f'UPDATE users SET state=1 WHERE user_id={user_id}')
+                view()
             except:
-                send('Пользователь заблокировал бота.')
-
-            database_query(f'UPDATE users SET state=1 WHERE user_id={user_id}')
-            view()
+                send('❌ Ошибка отправки. \nПохоже, пользователь не зарегистрирован!')
 
         elif state == 7:  # состояние отправки реф. кода
             code = database.execute(f'SELECT user_id, name, surname FROM users WHERE referral_code="{text}"').fetchone()
@@ -461,7 +463,8 @@ for i in longpoll.listen():
                 send('Здесь тебе нужна лишь информация о тебе и твой возраст: это обязательно;\n'
                      'Имя, фамилию и пол мы возьмём из твоего акаунта ВКонтакте.')
                 send('Отправь мне твой возраст;')
-                usersex = bot.method(f'users.get', {'user_ids': [user_id], 'fields': ['sex']})[0]['sex']  # 1 - жен. 2 - муж.
+                usersex = bot.method(f'users.get', {'user_ids': [user_id], 'fields': ['sex']})[0][
+                    'sex']  # 1 - жен. 2 - муж.
                 userdata = bot.method('users.get', {'user_ids': user_id})[0]  # имя/фамилия юзера по его id
                 code = generate_random_string(user_id)
                 database_query(
@@ -469,7 +472,7 @@ for i in longpoll.listen():
                     f'likes, dislikes, state, viewed_user, photo, views, pro, city, views_count, pro_update_date, '
                     f'referral_code, payment_code, age, sex)'
                     f' VALUES ({user_id}, "{userdata["first_name"]}", "{userdata["last_name"]}",'
-                    f'"Нет информации;", 0, 0, 9, "none", 0, 0, 0, "all", 0, "{now}", "{code}",'
+                    f'"Нет информации;", 0, 0, 9, "{user_id}", 0, 0, 0, "all", 0, "{now}", "{code}",'
                     f'0, 0, {usersex});')  # добавляем анкету в базу
             else:
                 send('Для начала создайте анкету 👼', createprofile.get_keyboard())
@@ -477,7 +480,7 @@ for i in longpoll.listen():
             # TODO СОЗДАНИЕ АНКЕТЫ
 
         else:
-            if 'моя анкета' in text:
+            if '🙍‍♂' in text:
                 userdata = database.execute(
                     f'SELECT name, surname, about, views, likes, dislikes, age FROM users WHERE '
                     f'user_id={user_id}').fetchone()  # получение акаунта юзера
@@ -520,6 +523,7 @@ for i in longpoll.listen():
                                  f'💬 Комментарий: {userdata["comment"]}'
                                  '\n\nПремиум активирован 👑', promainmenu.get_keyboard())
                             database_query(f'UPDATE users SET payment_code=0, pro=1 WHERE user_id={user_id}')
+
                         elif phis[1].raw['errorCode'] != 0:
                             send('❌ Ошибка платежа. Повторите платёж и введите верный код.',
                                  back_payment_keyboard.get_keyboard())
@@ -541,6 +545,7 @@ for i in longpoll.listen():
                 send('ок', mainmenu.get_keyboard())
                 database_query(f'UPDATE users SET pro=0 WHERE user_id={user_id}')
 
+
             elif 'купить pro' in text:
                 url = get_qiwi_payment_url()
                 code = generate_payment_code()
@@ -561,24 +566,25 @@ for i in longpoll.listen():
                 database_query(f'UPDATE users SET state=101 WHERE user_id={user_id}')
 
             elif 'обновить фото' in text:
-                send('Обновляю ⚙')
+                send('Скачиваю фото с твоей страницы вконтакте ⚙')
                 photo_url = bot.method(f'users.get', {'fields': ['photo_max_orig'], 'user_id': user_id})[0][
                     'photo_max_orig']
                 database_query(f'UPDATE users SET photo="{photo_url}" WHERE user_id={user_id}')
 
                 with open(f'users_photos/{user_id}.png', 'wb') as f:
                     f.write(requests.get(photo_url).content)
-
+                send('Загружаю фото на сервер ВКонтакте ⚙')
                 upload_url = bot.method(f'photos.getMessagesUploadServer', {})['upload_url']
                 upload = requests.post(upload_url, files={'photo': open(f'users_photos/{user_id}.png', 'rb')}).json()
                 result = bot.method('photos.saveMessagesPhoto', {'photo': upload['photo'],
                                                                  'server': upload['server'],
                                                                  'hash': upload['hash']})[0]
-
+                send('Составляю адрес доставки фото ⚙')
                 photo = 'photo' + str(result['owner_id']) + '_' + str(result['id'])
-
+                send('Сохраняю фото тебе в профиль ⚙')
                 database_query(f'UPDATE users SET photo="{photo}" WHERE user_id={user_id}')
                 send('✅ Твоё фото обновлено;')
+
 
             elif 'мой реф. код' in text:
                 code = database.execute(f'SELECT referral_code FROM users WHERE user_id={user_id}').fetchone()[0]
@@ -595,6 +601,7 @@ for i in longpoll.listen():
                 else:
                     send('Ваш реферальный код уже неактивен 👴')
 
+
             elif 'рассылка' in text:
                 text = text.split('рассылка')[1]
                 users = database.execute(f'SELECT user_id FROM users').fetchall()
@@ -603,6 +610,7 @@ for i in longpoll.listen():
                         send(text, None, i[0])
                     except:
                         send('Заблокированный юзер!')
+
 
             elif 'ввести реф. код' in text:
                 send('Введите реф. код: ')
@@ -633,7 +641,7 @@ for i in longpoll.listen():
                      'https://vk.com/@datingbotvk-udalenie-akauntov')
                 database_query(f'UPDATE users SET state=3 WHERE user_id={user_id}')  # меняю состояние
 
-            elif 'смотреть' in text:
+            elif 'смотреть' in text or 'продолжить просмотр' in text:
                 view()  # отправляю новую анкету
 
             elif 'отменить платёж' in text:
@@ -643,41 +651,45 @@ for i in longpoll.listen():
                     keyboard = promainmenu
                 database_query(f'UPDATE users SET payment_code=0 WHERE user_id={user_id}')
                 send('✅ Покупка подписки pro отменена.', keyboard.get_keyboard())
+                view()
+
 
             elif '❤' in text:  # лайк
-                recipient = database.execute(f'SELECT viewed_user FROM users WHERE user_id={user_id}').fetchone()
-                recipient = database.execute(
-                    f'SELECT name, surname, user_id FROM users WHERE user_id={recipient[0]}').fetchone()
-                recipient_likes = \
-                    database.execute(f'SELECT likes FROM users WHERE user_id={recipient[2]}').fetchone()[0]
-                database_query(f'UPDATE users SET likes={recipient_likes + 1} WHERE user_id={recipient[2]}')
-                sender = database.execute(f'SELECT name, surname FROM users WHERE user_id={user_id}').fetchone()
-                user = bot.method(f'users.get', {'user_ids': [user_id], 'fields': 'screen_name'})[0]
+                try:
+                    recipient = database.execute(f'SELECT viewed_user FROM users WHERE user_id={user_id}').fetchone()
+                    recipient = database.execute(
+                        f'SELECT name, surname, user_id FROM users WHERE user_id={recipient[0]}').fetchone()
+                    recipient_likes = \
+                        database.execute(f'SELECT likes FROM users WHERE user_id={recipient[2]}').fetchone()[0]
+                    database_query(f'UPDATE users SET likes={recipient_likes + 1} WHERE user_id={recipient[2]}')
+                    sender = database.execute(f'SELECT name, surname FROM users WHERE user_id={user_id}').fetchone()
+                    user = bot.method(f'users.get', {'user_ids': [user_id], 'fields': 'screen_name'})[0]
 
-                userdata = database.execute(
-                    f'SELECT photo, age, city, name, surname, about FROM users WHERE user_id={user_id}').fetchone()
-                city = 'не указан' if userdata[2] is None or userdata[2] == 'none' else userdata[2]
-                photo = userdata[0]
+                    userdata = database.execute(
+                        f'SELECT photo, age, city, name, surname, about FROM users WHERE user_id={user_id}').fetchone()
+                    city = 'не указан' if userdata[2] is None or userdata[2] == 'none' else userdata[2]
+                    photo = userdata[0]
 
-                if photo == '0':
-                    photo = 'photo-204338719_457239214'
+                    if photo == '0':
+                        photo = 'photo-204338719_457239214'
 
-                if city == 'all':
-                    city = 'все города'
+                    if city == 'all':
+                        city = 'все города'
 
-                write_a_message_keyboard = VkKeyboard(inline=True)
-                write_a_message_keyboard.add_openlink_button('Написать 📧', f'https://vk.me/{user["screen_name"]}')
+                    write_a_message_keyboard = VkKeyboard(inline=True)
+                    write_a_message_keyboard.add_openlink_button('Написать 📧', f'https://vk.me/{user["screen_name"]}')
 
-                age = userdata[1] if userdata[1] else 'не указан'
+                    age = userdata[1] if userdata[1] else 'не указан'
 
-                send(f'Лайк поставлен: {recipient[0]} {recipient[1]};')
-                send(f'{recipient[0]}, привет!👋\n'
-                     f'{sender[0]} {sender[1]} поставил тебе лайк!\n\n'
-                     '✅ Вот его анкета:\n\n'
-                     f'💞 {userdata[3]} {userdata[4]} | {age} | {city}\n\n'
-                     f'{userdata[5]}\n\nФото:', write_a_message_keyboard.get_keyboard(),
-                     recipient[2],
-                     photo)
+                    send(f'{recipient[0]}, привет!👋\n'
+                         f'{sender[0]} {sender[1]} поставил тебе лайк!\n\n'
+                         '✅ Вот его анкета:\n\n'
+                         f'💞 {userdata[3]} {userdata[4]} | {age} | {city}\n\n'
+                         f'{userdata[5]}\n\nФото:', write_a_message_keyboard.get_keyboard(),
+                         recipient[2],
+                         photo)
+                except:
+                    send('Вы никого не просматриваете.')
 
                 view()  # отправляю новую анкету
 
@@ -689,6 +701,5 @@ for i in longpoll.listen():
                     database.execute(f'SELECT dislikes FROM users WHERE user_id={recipient[2]}').fetchone()[
                         0]
                 database_query(f'UPDATE users SET dislikes={recipient_likes + 1} WHERE user_id={recipient[2]}')
-                send(f'Дизлайк поставлен: {recipient[0]} {recipient[1]};')
 
                 view()  # отправляю новую анкету
