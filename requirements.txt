@@ -1,0 +1,3 @@
+pyqiwi==0.2.0
+qiwipy==2.1.6
+vk-api==11.9.1
