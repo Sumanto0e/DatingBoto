@@ -108,6 +108,8 @@ sex_keyboard.add_button('Всех', VkKeyboardColor.SECONDARY)
 back_payment_keyboard = VkKeyboard()
 back_payment_keyboard.add_button('Отменить платёж', VkKeyboardColor.SECONDARY)
 
+end_registration_keyboard = VkKeyboard()
+end_registration_keyboard.add_button('Завершить регистрацию ✅', VkKeyboardColor.POSITIVE)
 
 # ...
 
@@ -421,8 +423,7 @@ for i in longpoll.listen():
                 send('❌ Введите корректные значения;')
 
             if end:
-                send('До полной регистрации осталось несколько шагов;\n'
-                     'Отправьте боту любое сообщение.')
+                send('Отлично ✅', end_registration_keyboard.get_keyboard())
                 photo_url = bot.method(f'users.get', {'fields': ['photo_max_orig'], 'user_id': user_id})[0][
                     'photo_max_orig']
 
