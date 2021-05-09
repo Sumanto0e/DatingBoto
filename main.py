@@ -546,6 +546,9 @@ for i in longpoll.listen():
                 send('ок', mainmenu.get_keyboard())
                 database_query(f'UPDATE users SET pro=0 WHERE user_id={user_id}')
 
+            elif 'дапро' in text:
+                send('ок', mainmenu.get_keyboard())
+                database_query(f'UPDATE users SET pro=1 WHERE user_id={user_id}')
 
             elif 'купить pro' in text:
                 url = get_qiwi_payment_url()
