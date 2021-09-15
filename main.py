@@ -9,8 +9,8 @@
 import datetime  # модуль для работы с датами
 import random  # модуль для работы со случайными числами
 import requests  # модуль для запросов (в моём случае к QIWI api)
-import pyqiwi  # модуль для получения истории платежей (Т.К. через api не получилось)
-import keys  # ...
+import keys  # ..
+import pyqiwi # .
 from vk_api import VkApi  # модуль для работы с api
 from vk_api.longpoll import VkLongPoll, VkEventType  # модуль для работы с longpoll
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor  # модуль для работы с клавиатурами
@@ -42,7 +42,9 @@ try:
                      f'payment_code INT,'
                      f'age INT,'
                      f'sex INT,'
-                     f'select_sex INT);')
+                     f'select_sex INT,'
+                     f'active INT,'
+                     f'all_views INT);')
     database.commit()
 except:
     pass
@@ -52,7 +54,7 @@ except:
 bot = VkApi(token=keys.VK_API_ACCESS_TOKEN)
 longpoll = VkLongPoll(bot)
 wallet = pyqiwi.Wallet(token=keys.QIWI_API_ACCESS_TOKEN, number=keys.QIWI_API_TELEPHONE_NUMBER)
-qiwi_count = 10
+qiwi_count = 1
 # ...
 
 
@@ -75,6 +77,10 @@ promainmenu.add_button('🙍‍♂', VkKeyboardColor.SECONDARY)
 promainmenu.add_line()
 promainmenu.add_button('Продолжить просмотр 👀', VkKeyboardColor.POSITIVE)
 
+geolocation_keyboard = VkKeyboard()
+geolocation_keyboard.add_location_button()
+geolocation_keyboard.add_button('❌ Отмена')
+
 createprofile = VkKeyboard(inline=True)
 createprofile.add_button(f'Создать анкету {choice(["🎅", "🎁", "😉", "👑"])}')
 
@@ -82,6 +88,8 @@ main_profile_keyboard = VkKeyboard(inline=True)
 main_profile_keyboard.add_button('Мой реф. код 🔑', VkKeyboardColor.SECONDARY)
 main_profile_keyboard.add_line()
 main_profile_keyboard.add_button('Ввести реф. код 🔑', VkKeyboardColor.SECONDARY)
+main_profile_keyboard.add_line()
+main_profile_keyboard.add_button('Отключить/включить акаунт 😴', VkKeyboardColor.NEGATIVE)
 main_profile_keyboard.add_line()
 main_profile_keyboard.add_button('Меню редактирования ✏', VkKeyboardColor.PRIMARY)
 
@@ -237,22 +245,24 @@ for i in longpoll.listen():
             pro = database.execute(f'SELECT pro FROM users WHERE user_id={user_id}').fetchone()[0]
 
             if pro == 1 or views_count < 10:
+                all_views = database.execute(f'SELECT all_views FROM users WHERE user_id={user_id}').fetchone()[0]
+                print(all_views)
+                database_query(f'UPDATE users SET all_views={all_views + 1} WHERE user_id={user_id} ')
                 sex = database.execute(f'SELECT select_sex FROM users WHERE user_id={user_id}').fetchone()[0]
                 city = database.execute(f'SELECT city FROM users WHERE user_id={user_id}').fetchone()[0]
                 if city != 'all':
                     if sex == 0:
                         usersdata = database.execute(f'SELECT * FROM '
-                                                     f'users WHERE city="{city}"').fetchall()  # Все пользователи бота с опред. городом
+                                                     f'users WHERE city="{city}" AND active=1').fetchall()  # Все пользователи бота с опред. городом
                     else:
                         usersdata = database.execute(f'SELECT * FROM '
-                                                     f'users WHERE city="{city}" AND sex={sex}').fetchall()
+                                                     f'users WHERE city="{city}" AND sex={sex} AND active=1').fetchall()
                 else:
                     if sex == 0:
-                        usersdata = database.execute(f'SELECT * FROM '
-                                                     f'users').fetchall()  # Все пользователи бота
+                        usersdata = database.execute(f'SELECT * FROM users WHERE active=1').fetchall()  # Все пользователи бота
                     else:
                         usersdata = database.execute(f'SELECT * FROM '
-                                                     f'users WHERE sex={sex}').fetchall()
+                                                     f'users WHERE sex={sex} AND active=1').fetchall()
 
                 if len(usersdata) > 1:
                     for i in range(len(usersdata)):  # убираем id текущего юзера
@@ -309,7 +319,7 @@ for i in longpoll.listen():
             send('Так-же вы можете сменить город, чтобы вы знакомились с людьми из вашего города.'
                  '\nПока вы не сменили город, вам показываются люди из всех городов.\n'
                  'Читайте тут: https://vk.com/@datingbotvk-smena-goroda-i-s-chem-ee-edyat.')
-            database_query(f'UPDATE users SET state=1 WHERE user_id={user_id}')
+            database_query(f'UPDATE users SET state=1, active=1, all_views=1 WHERE user_id={user_id}')
 
         elif state == 2:  # состояние смены описания при регистрации
             send(f'✅ Добавлено описание: {normaltext}')
@@ -382,28 +392,38 @@ for i in longpoll.listen():
                 database_query(f'UPDATE users SET city="all" WHERE user_id={user_id}')
                 send('Теперь вы просматриваете все города.')
             else:
-                if result['items'][0].get('geo', False):
-                    result = result['items'][0]['geo']['place']['city']
-                    send(f'Ваш город - {result}.'
-                         f'Мы заполнили эту информация, и теперь будем показывать вам людей из вашего города ✅')
-                    database_query(f'UPDATE users SET city="{result}" WHERE user_id={user_id}')
-                else:
-                    send('Это не местоположение  📍')
+                try:
+                    if result['items'][0].get('geo', False):
+                        result = result['items'][0]['geo']['place']['city']
+                        send(f'Ваш город - {result}.'
+                             f'Мы заполнили эту информация, и теперь будем показывать вам людей из вашего города ✅')
+                        database_query(f'UPDATE users SET city="{result}" WHERE user_id={user_id}')
+                    else:
+                        send('Это не местоположение  📍')
+                except:
+                    send('❌ Ошибка')
 
             database_query(f'UPDATE users SET state=1 WHERE user_id={user_id}')
 
         elif state == 9:  # cостояние смены возраста при регистрации
             if text.isdigit():
-                send('✅ Принято;')
-                database_query(f'UPDATE users SET state=2, age={int(text)} WHERE user_id={user_id}')
-                send('Отправь мне информацию о тебе в одном сообщении (чем ты хочешь заняться, или что ищешь тут);')
+                if int(text) >= 18:
+                    send('✅ Принято;')
+                    database_query(f'UPDATE users SET state=2, age={int(text)} WHERE user_id={user_id}')
+                    send('Отправь мне информацию о тебе в одном сообщении (чем ты хочешь заняться, или что ищешь тут);')
+                else:
+                    send('❌ Обязательное условие регистрации: вам больше 18 лет.')
             else:
                 send('❌ Укажи корректный возраст;')
 
         elif state == 91:  # cостояние смены возраста
             if text.isdigit():
-                send('✅ Принято;')
-                database_query(f'UPDATE users SET state=1, age={int(text)} WHERE user_id={user_id}')
+                if int(text) >= 18:
+                    send('✅ Принято;')
+                    database_query(f'UPDATE users SET state=1, age={int(text)} WHERE user_id={user_id}')
+                else:
+                    send('❌ Обязательное условие регистрации: вам больше 18 лет.')
+                    database_query(f'UPDATE users SET state=1 WHERE user_id={user_id}')
             else:
                 send('❌ Укажи корректный возраст;')
 
@@ -453,11 +473,7 @@ for i in longpoll.listen():
                 send('❌ Введите корректные значения;')
 
 
-        # TODO OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
-
         elif state is None:
-
-            # TODO СОЗДАНИЕ АНКЕТЫ
 
             if 'создать анкету' in text:  # старт нового пользователя
                 send('Привет!\nЯ - бот для знакомств, и сейчас мы с тобой создадим тебе анкету!')
@@ -477,8 +493,6 @@ for i in longpoll.listen():
                     f'0, 0, {usersex});')  # добавляем анкету в базу
             else:
                 send('Для начала создайте анкету 👼', createprofile.get_keyboard())
-
-            # TODO СОЗДАНИЕ АНКЕТЫ
 
         else:
             if '🙍‍♂' in text:
@@ -621,9 +635,8 @@ for i in longpoll.listen():
                 database_query(f'UPDATE users SET state=7 WHERE user_id={user_id}')  # меняю состояние
 
             elif 'город' in text:
-                send('Отправь мне геолокацию (где ты находишься) и я буду отправлять тебе людей из твоего города ✅\n\n'
-                     'Как это сделать читайте тут:\n'
-                     'https://vk.com/@datingbotvk-smena-goroda-i-s-chem-ee-edyat')
+                send('Отправь мне геолокацию (где ты находишься) и я буду отправлять тебе людей из твоего города ✅',
+                     geolocation_keyboard.get_keyboard())
                 database_query(f'UPDATE users SET state=8 WHERE user_id={user_id}')  # меняю состояние
 
             elif '✉' in text:
@@ -644,6 +657,15 @@ for i in longpoll.listen():
                      'Подробнее про удалённые акаунты вы можете прочитать тут:\n'
                      'https://vk.com/@datingbotvk-udalenie-akauntov')
                 database_query(f'UPDATE users SET state=3 WHERE user_id={user_id}')  # меняю состояние
+
+            elif 'отключить/включить акаунт' in text:
+                active = database.execute(f'SELECT active FROM users WHERE user_id={user_id}').fetchone()[0]
+                if active == 1:
+                    send('Ваш аккаунт отключён ✅')
+                    database_query(f'UPDATE users SET active=0 WHERE user_id={user_id}')  # меняю состояние
+                else:
+                    send('Ваш аккаунт включён ✅')
+                    database_query(f'UPDATE users SET active=1 WHERE user_id={user_id}')  # меняю состояние
 
             elif 'смотреть' in text or 'продолжить просмотр' in text:
                 view()  # отправляю новую анкету
@@ -707,3 +729,10 @@ for i in longpoll.listen():
                 database_query(f'UPDATE users SET dislikes={recipient_likes + 1} WHERE user_id={recipient[2]}')
 
                 view()  # отправляю новую анкету
+
+            elif '❌ отмена' in text:
+                database_query(f'UPDATE users SET state=0 WHERE user_id={user_id}')
+                send('Действие отменено ✅', mainmenu.get_keyboard())
+
+            if database.execute(f'SELECT all_views FROM users WHERE user_id={user_id}').fetchone()[0] % 40 == 0:
+                send('👋 Привет\n Чтобы просматривать больше анкет, подпишись!')
