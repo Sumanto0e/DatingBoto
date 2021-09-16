@@ -81,6 +81,10 @@ geolocation_keyboard = VkKeyboard()
 geolocation_keyboard.add_location_button()
 geolocation_keyboard.add_button('❌ Отмена')
 
+
+cancel_keyboard = VkKeyboard()
+cancel_keyboard.add_button('❌ Отмена')
+
 createprofile = VkKeyboard(inline=True)
 createprofile.add_button(f'Создать анкету {choice(["🎅", "🎁", "😉", "👑"])}')
 
@@ -323,8 +327,9 @@ for i in longpoll.listen():
 
         elif state == 2:  # состояние смены описания при регистрации
             send(f'✅ Добавлено описание: {normaltext}')
-            send(f'Теперь выбери, кого ты хочешь видеть в рекомендациях?', sex_keyboard.get_keyboard())
-            database_query(f'UPDATE users SET about="{normaltext}", state=10 WHERE user_id={user_id}')
+            database_query(f'UPDATE users SET about="{normaltext}", state=1 WHERE user_id={user_id}')
+            send('📍 Отправь мне твоё местоположеие', geolocation_keyboard.get_keyboard())
+            database_query(f'UPDATE users SET state=8 WHERE user_id={user_id}')
 
         elif state == 21:  # состояние смены описания
             send(f'✅ Описание изменено: {normaltext}')
@@ -345,22 +350,28 @@ for i in longpoll.listen():
 
         elif state == 5:  # состояние отправки сообщения
             try:
-                send('✅ Отправлено;')
+                if '❌ отмена' in text:
+                    database_query(f'UPDATE users SET state=0 WHERE user_id={user_id}')
+                    send('Действие отменено ✅', mainmenu.get_keyboard())
+                else:
+                    send('✅ Отправлено;')
 
-                recipient = database.execute(f'SELECT viewed_user FROM users WHERE user_id={user_id}').fetchone()
-                recipient = database.execute(
-                    f'SELECT name, surname, user_id FROM users WHERE user_id={recipient[0]}').fetchone()
-                sender = database.execute(f'SELECT name, surname FROM users WHERE user_id={user_id}').fetchone()
-                user = bot.method(f'users.get', {'user_ids': [user_id], 'fields': 'screen_name'})[0]
-                try:
-                    send(f'@{user["screen_name"]} ({sender[0]} {sender[1]}) оставил тебе сообщение:\n'
-                         f'{text}', None, recipient[2])
+                    recipient = database.execute(f'SELECT viewed_user FROM users WHERE user_id={user_id}').fetchone()
+                    recipient = database.execute(
+                        f'SELECT name, surname, user_id FROM users WHERE user_id={recipient[0]}').fetchone()
+                    sender = database.execute(f'SELECT name, surname FROM users WHERE user_id={user_id}').fetchone()
+                    user = bot.method(f'users.get', {'user_ids': [user_id], 'fields': 'screen_name'})[0]
+                    try:
+                        send(f'@{user["screen_name"]} ({sender[0]} {sender[1]}) оставил тебе сообщение:\n'
+                             f'{text}', None, recipient[2])
 
-                except:
-                    send('Пользователь заблокировал бота.')
+                    except:
+                        send('Пользователь заблокировал бота.')
+
+                    view()
 
                 database_query(f'UPDATE users SET state=1 WHERE user_id={user_id}')
-                view()
+
             except:
                 send('❌ Ошибка отправки. \nПохоже, пользователь не зарегистрирован!')
 
@@ -403,7 +414,12 @@ for i in longpoll.listen():
                 except:
                     send('❌ Ошибка')
 
-            database_query(f'UPDATE users SET state=1 WHERE user_id={user_id}')
+            if database.execute(f'SELECT active FROM users WHERE user_id={user_id}').fetchone()[0] is None:
+                send(f'Теперь выбери, кого ты хочешь видеть в рекомендациях?', sex_keyboard.get_keyboard())
+                database_query(f'UPDATE users SET about="{normaltext}", state=10 WHERE user_id={user_id}')
+
+            else:
+                database_query(f'UPDATE users SET state=1 WHERE user_id={user_id}')
 
         elif state == 9:  # cостояние смены возраста при регистрации
             if text.isdigit():
@@ -495,7 +511,11 @@ for i in longpoll.listen():
                 send('Для начала создайте анкету 👼', createprofile.get_keyboard())
 
         else:
-            if '🙍‍♂' in text:
+            if '❌ отмена' in text:
+                database_query(f'UPDATE users SET state=0 WHERE user_id={user_id}')
+                send('Действие отменено ✅', mainmenu.get_keyboard())
+
+            elif '🙍‍♂' in text:
                 userdata = database.execute(
                     f'SELECT name, surname, about, views, likes, dislikes, age FROM users WHERE '
                     f'user_id={user_id}').fetchone()  # получение акаунта юзера
@@ -640,7 +660,7 @@ for i in longpoll.listen():
                 database_query(f'UPDATE users SET state=8 WHERE user_id={user_id}')  # меняю состояние
 
             elif '✉' in text:
-                send('Напишите своё сообщение: ')
+                send('Напишите своё сообщение: ', keyboard=cancel_keyboard.get_keyboard())
                 database_query(f'UPDATE users SET state=5 WHERE user_id={user_id}')  # меняю состояние
 
             elif 'изменить возраст' in text:
@@ -729,10 +749,6 @@ for i in longpoll.listen():
                 database_query(f'UPDATE users SET dislikes={recipient_likes + 1} WHERE user_id={recipient[2]}')
 
                 view()  # отправляю новую анкету
-
-            elif '❌ отмена' in text:
-                database_query(f'UPDATE users SET state=0 WHERE user_id={user_id}')
-                send('Действие отменено ✅', mainmenu.get_keyboard())
 
             if database.execute(f'SELECT all_views FROM users WHERE user_id={user_id}').fetchone()[0] % 40 == 0:
                 send('👋 Привет\n Чтобы просматривать больше анкет, подпишись!')
