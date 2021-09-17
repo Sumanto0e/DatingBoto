@@ -253,7 +253,6 @@ for i in longpoll.listen():
 
             if pro == 1 or views_count < 10:
                 all_views = database.execute(f'SELECT all_views FROM users WHERE user_id={user_id}').fetchone()[0]
-                print(all_views)
                 database_query(f'UPDATE users SET all_views={all_views + 1} WHERE user_id={user_id} ')
                 sex = database.execute(f'SELECT select_sex FROM users WHERE user_id={user_id}').fetchone()[0]
                 city = database.execute(f'SELECT city FROM users WHERE user_id={user_id}').fetchone()[0]
@@ -271,7 +270,7 @@ for i in longpoll.listen():
                         usersdata = database.execute(f'SELECT * FROM '
                                                      f'users WHERE sex={sex} AND active=1').fetchall()
 
-                if len(usersdata) > 1:
+                if len(usersdata) >= 1:
                     for i in range(len(usersdata)):  # убираем id текущего юзера
                         if usersdata[i][0] == user_id:
                             del usersdata[i]
