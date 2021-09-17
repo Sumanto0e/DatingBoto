@@ -85,6 +85,9 @@ geolocation_keyboard.add_button('❌ Отмена')
 cancel_keyboard = VkKeyboard()
 cancel_keyboard.add_button('❌ Отмена')
 
+description_keyboard = VkKeyboard()
+description_keyboard.add_button('❌ Без описания')
+
 createprofile = VkKeyboard(inline=True)
 createprofile.add_button(f'Создать анкету {choice(["🎅", "🎁", "😉", "👑"])}')
 
@@ -326,14 +329,22 @@ for i in longpoll.listen():
             database_query(f'UPDATE users SET state=1, active=1, all_views=1 WHERE user_id={user_id}')
 
         elif state == 2:  # состояние смены описания при регистрации
-            send(f'✅ Добавлено описание: {normaltext}')
-            database_query(f'UPDATE users SET about="{normaltext}", state=1 WHERE user_id={user_id}')
+            if 'без описания' in text:
+                database_query(f'UPDATE users SET about="", state=8 WHERE user_id={user_id}')
+                send('Вы оставили анкету без описания ✅')
+            else:
+                send(f'✅ Добавлено описание: {normaltext}')
+                database_query(f'UPDATE users SET about="{normaltext}", state=1 WHERE user_id={user_id}')
             send('📍 Отправь мне твоё местоположеие', geolocation_keyboard.get_keyboard())
             database_query(f'UPDATE users SET state=8 WHERE user_id={user_id}')
 
         elif state == 21:  # состояние смены описания
-            send(f'✅ Описание изменено: {normaltext}')
-            database_query(f'UPDATE users SET about="{normaltext}", state=1 WHERE user_id={user_id}')
+            if 'без описания' in text:
+                database_query(f'UPDATE users SET about="", state=1 WHERE user_id={user_id}')
+                send('Вы оставили анкету без описания ✅')
+            else:
+                send(f'✅ Описание изменено: {normaltext}')
+                database_query(f'UPDATE users SET about="{normaltext}", state=1 WHERE user_id={user_id}')
 
         elif state == 3:  # состояние удаления акаунта
             if text == 'да, я подтверждаю удаление акаунта.':
@@ -426,7 +437,7 @@ for i in longpoll.listen():
                 if int(text) >= 18:
                     send('✅ Принято;')
                     database_query(f'UPDATE users SET state=2, age={int(text)} WHERE user_id={user_id}')
-                    send('Отправь мне информацию о тебе в одном сообщении (чем ты хочешь заняться, или что ищешь тут);')
+                    send('Отправь мне информацию о тебе в одном сообщении (чем ты хочешь заняться, или что ищешь тут);', keyboard=description_keyboard.get_keyboard())
                 else:
                     send('❌ Обязательное условие регистрации: вам больше 18 лет.')
             else:
