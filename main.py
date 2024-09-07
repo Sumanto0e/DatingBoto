@@ -11,6 +11,9 @@ import random  # модуль для работы со случайными чи
 import requests  # модуль для запросов (в моём случае к QIWI api)
 import keys  # ..
 import pyqiwi # .
+from vk_api import VkApi  # модуль для работы с api
+from vk_api.longpoll import VkLongPoll, VkEventType  # модуль для работы с longpoll
+from vk_api.keyboard import VkKeyboard, VkKeyboardColor  # модуль для работы с клавиатурами
 from random import choice  # ...
 from sqlite3 import connect  # модуль для работы с базами данных
 
